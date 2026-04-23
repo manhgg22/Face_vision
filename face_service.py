@@ -23,8 +23,9 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 os.makedirs(DB_DIR, exist_ok=True)
 
 # ── Consistent defaults ────────────────────────────────────────────────────────
-DEFAULT_MODEL    = "Facenet512"
-DEFAULT_DETECTOR = "retinaface" 
+# Switch to yolov8 and Facenet for MAX SPEED (under 1s)
+DEFAULT_MODEL    = "Facenet"   
+DEFAULT_DETECTOR = "ssd"    
 # ──────────────────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)

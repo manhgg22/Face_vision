@@ -3,18 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FaceID Pro - Hệ Thống Nhận Diện Khuôn Mặt</title>
+    <title>FaceID Pro - Intelligence Analysis</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary: #6366f1;
-            --primary-hover: #4f46e5;
+            --primary-light: #818cf8;
             --bg: #0f172a;
             --card-bg: #1e293b;
             --text: #f8fafc;
             --text-dim: #94a3b8;
             --success: #10b981;
             --error: #ef4444;
+            --gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
         }
 
         * {
@@ -45,154 +46,198 @@
         }
 
         header h1 {
-            font-size: 2.5rem;
+            font-size: 2.8rem;
             font-weight: 600;
-            background: linear-gradient(to right, #818cf8, #c084fc);
+            background: linear-gradient(to right, #818cf8, #c084fc, #f472b6);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
+            letter-spacing: -1px;
         }
 
-        header p {
-            color: var(--text-dim);
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 16px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 999px;
+            color: var(--success);
+            font-size: 0.85rem;
+            font-weight: 600;
         }
 
         .main-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1.2fr 0.8fr;
             gap: 24px;
         }
 
         .card {
             background: var(--card-bg);
-            padding: 24px;
-            border-radius: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+            position: relative;
+            overflow: hidden;
         }
 
-        .card h2 {
-            margin-bottom: 20px;
-            font-size: 1.25rem;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 4px;
+            background: var(--gradient);
         }
 
         .upload-area {
-            border: 2px dashed rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-            padding: 40px;
+            border: 2px dashed rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
+            padding: 60px 20px;
             text-align: center;
             cursor: pointer;
-            transition: all 0.3s;
-            margin-bottom: 20px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-bottom: 24px;
+            background: rgba(255, 255, 255, 0.02);
         }
 
         .upload-area:hover {
             border-color: var(--primary);
             background: rgba(99, 102, 241, 0.05);
+            transform: scale(1.01);
         }
 
         #preview {
             max-width: 100%;
-            max-height: 300px;
-            border-radius: 8px;
+            max-height: 350px;
+            border-radius: 12px;
             display: none;
-            margin-top: 10px;
+            margin: 0 auto;
+            box-shadow: 0 10px 15px rgba(0,0,0,0.3);
         }
 
         .btn {
             width: 100%;
-            padding: 12px;
-            border-radius: 8px;
+            padding: 16px;
+            border-radius: 12px;
             border: none;
-            background: var(--primary);
+            background: var(--gradient);
             color: white;
+            font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.3);
         }
 
         .btn:hover {
-            background: var(--primary-hover);
-            transform: translateY(-1px);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.4);
+            filter: brightness(1.1);
         }
 
         .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+            transform: none;
+        }
+
+        /* --- Progress Container --- */
+        #progress-container {
+            display: none;
+            margin-top: 24px;
+        }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 999px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--gradient);
+            transition: width 0.4s ease-out;
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        .progress-text {
+            display: flex;
+            justify-content: space-between;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+        }
+
+        #status-message {
+            font-weight: 500;
+            color: var(--primary-light);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
         }
 
         #result-area {
-            margin-top: 20px;
-            padding: 16px;
-            border-radius: 8px;
-            background: rgba(0, 0, 0, 0.2);
-            min-height: 60px;
+            margin-top: 24px;
+            padding: 20px;
+            border-radius: 16px;
+            background: rgba(0, 0, 0, 0.25);
             display: none;
+            animation: slideUp 0.4s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
         }
 
         .match-item {
             display: flex;
             justify-content: space-between;
-            padding: 10px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            align-items: center;
+            padding: 14px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            margin-bottom: 10px;
         }
 
-        .match-item:last-child { border-bottom: none; }
+        .name { font-weight: 600; font-size: 1.1rem; color: #fff; }
+        .distance-badge {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
 
-        .name { font-weight: 600; color: var(--success); }
-        .distance { color: var(--text-dim); font-size: 0.875rem; }
-
-        /* DB List */
         .db-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px;
+            padding: 14px;
             background: rgba(255, 255, 255, 0.03);
-            border-radius: 8px;
-            margin-bottom: 8px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            transition: 0.2s;
         }
 
-        .badge {
-            background: var(--primary);
-            padding: 2px 8px;
-            border-radius: 999px;
-            font-size: 0.75rem;
+        .db-item:hover {
+            background: rgba(255, 255, 255, 0.06);
         }
 
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: var(--success);
-            display: inline-block;
-            margin-right: 5px;
-        }
-
-        #loading {
-            display: none;
-            text-align: center;
-            padding: 10px;
-            color: var(--primary);
-        }
-
-        .loader {
-            width: 20px;
-            height: 20px;
-            border: 3px solid #FFF;
-            border-bottom-color: transparent;
-            border-radius: 50%;
-            display: inline-block;
-            box-sizing: border-box;
-            animation: rotation 1s linear infinite;
-        }
-
-        @keyframes rotation {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .count-badge {
+            background: #334155;
+            color: #cbd5e1;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
         }
     </style>
 </head>
@@ -200,35 +245,49 @@
     <div class="container">
         <header>
             <h1>FaceID Intelligence</h1>
-            <p><span class="status-dot"></span> Dịch vụ đang hoạt động tại cổng 8001</p>
+            <div class="status-badge">
+                <span style="width: 8px; height: 8px; background: var(--success); border-radius: 50%; margin-right: 8px;"></span>
+                Hệ thống đang sẵn sàng
+            </div>
         </header>
 
         <div class="main-grid">
-            <!-- Left: Recognition -->
             <div class="card">
-                <h2>🔍 Nhận Diện Danh Tính</h2>
+                <h2>🔍 Nhận diện danh tính</h2>
                 <div class="upload-area" id="drop-zone">
-                    <p id="upload-prompt">Kéo thả ảnh vào đây hoặc click để chọn</p>
+                    <div id="upload-prompt">
+                        <p style="font-size: 1.2rem; margin-bottom: 10px;">Thả ảnh vào đây</p>
+                        <p style="color: var(--text-dim); font-size: 0.9rem;">Hỗ trợ JPG, PNG, WEBP</p>
+                    </div>
                     <img id="preview" alt="Preview">
                     <input type="file" id="file-input" hidden accept="image/*">
                 </div>
-                <button id="find-btn" class="btn" disabled>Bắt đầu nhận diện</button>
                 
-                <div id="loading">
-                    <span class="loader"></span> Đang xử lý AI (lần đầu sẽ hơi chậm)...
+                <button id="find-btn" class="btn" disabled>Bắt đầu phân tích</button>
+
+                <div id="progress-container">
+                    <div class="progress-bar-bg">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <div class="progress-text">
+                        <span id="status-message">Đang khởi tạo AI...</span>
+                        <span id="percentage-text">0%</span>
+                    </div>
                 </div>
 
                 <div id="result-area"></div>
             </div>
 
-            <!-- Right: Database Stats -->
             <div class="card">
-                <h2>📁 Cơ Sở Dữ Liệu</h2>
-                <div id="db-list">
-                    <p style="text-align: center; color: var(--text-dim);">Đang tải danh sách...</p>
+                <h2 style="margin-bottom: 20px;">📁 Danh sách Database</h2>
+                <div id="db-list" style="max-height: 500px; overflow-y: auto; padding-right: 5px;">
+                    <p style="text-align: center; color: var(--text-dim);">Đang tải dữ liệu...</p>
                 </div>
-                <hr style="margin: 20px 0; border: 0; border-top: 1px solid rgba(255,255,255,0.1);">
-                <button onclick="purgeCache()" class="btn" style="background: transparent; border: 1px solid var(--text-dim); color: var(--text-dim);">Xóa Cache Hệ Thống</button>
+                <div style="margin-top: 24px;">
+                    <button onclick="purgeCache()" class="btn" style="background: transparent; border: 1px solid rgba(255,255,255,0.1); font-size: 0.9rem;">
+                        🔄 Làm mới bộ nhớ đệm (Clear Cache)
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -240,9 +299,20 @@
         const findBtn = document.getElementById('find-btn');
         const resultArea = document.getElementById('result-area');
         const dbList = document.getElementById('db-list');
-        const loading = document.getElementById('loading');
+        const progressContainer = document.getElementById('progress-container');
+        const progressFill = document.getElementById('progress-fill');
+        const statusMsg = document.getElementById('status-message');
+        const percentText = document.getElementById('percentage-text');
 
-        // Handle Upload
+        const STATUS_MESSAGES = [
+            "Đang tải ảnh lên máy chủ...",
+            "Đang dò tìm khuôn mặt (RetinaFace)...",
+            "Đang trích xuất đặc trưng AI...",
+            "Đang đối soát cơ sở dữ liệu...",
+            "Đang tính toán độ trùng khớp...",
+            "Sắp hoàn tất..."
+        ];
+
         dropZone.onclick = () => fileInput.click();
         fileInput.onchange = (e) => handleFile(e.target.files[0]);
 
@@ -254,11 +324,48 @@
                 preview.style.display = 'block';
                 document.getElementById('upload-prompt').style.display = 'none';
                 findBtn.disabled = false;
+                resultArea.style.display = 'none';
             };
             reader.readAsDataURL(file);
         }
 
-        // Recognition
+        let progressInterval;
+        function startFakeProgress() {
+            progressContainer.style.display = 'block';
+            let progress = 0;
+            let messageIdx = 0;
+            
+            progressFill.style.width = '0%';
+            percentText.innerText = '0%';
+            statusMsg.innerText = STATUS_MESSAGES[0];
+
+            progressInterval = setInterval(() => {
+                if (progress < 90) {
+                    // Slows down as it gets higher
+                    const inc = progress < 50 ? 5 : (progress < 80 ? 2 : 0.5);
+                    progress += inc;
+                    progressFill.style.width = progress + '%';
+                    percentText.innerText = Math.round(progress) + '%';
+                    
+                    // Rotate messages
+                    if (progress % 15 < 1) {
+                        messageIdx = Math.min(messageIdx + 1, STATUS_MESSAGES.length - 1);
+                        statusMsg.innerText = STATUS_MESSAGES[messageIdx];
+                    }
+                }
+            }, 150);
+        }
+
+        function finishProgress() {
+            clearInterval(progressInterval);
+            progressFill.style.width = '100%';
+            percentText.innerText = '100%';
+            statusMsg.innerText = 'Hoàn tất!';
+            setTimeout(() => {
+                progressContainer.style.display = 'none';
+            }, 500);
+        }
+
         findBtn.onclick = async () => {
             const file = fileInput.files[0];
             if (!file) return;
@@ -267,86 +374,78 @@
             formData.append('image', file);
 
             findBtn.disabled = true;
-            loading.style.display = 'block';
             resultArea.style.display = 'none';
+            startFakeProgress();
 
             try {
-                const response = await fetch('/find', {
-                    method: 'POST',
-                    body: formData
-                });
+                const response = await fetch('/find', { method: 'POST', body: formData });
                 const data = await response.json();
-                
                 showResults(data);
             } catch (err) {
                 resultArea.innerHTML = `<p style="color: var(--error)">Lỗi kết nối: ${err.message}</p>`;
                 resultArea.style.display = 'block';
             } finally {
-                loading.style.display = 'none';
+                finishProgress();
                 findBtn.disabled = false;
             }
         };
 
         function showResults(data) {
             resultArea.style.display = 'block';
-            
             if (data.success && data.match_count > 0) {
-                let html = '<strong>✅ Kết quả tìm thấy:</strong><div style="margin-top:10px">';
+                let html = '<div style="margin-bottom:15px; font-weight:600; color:var(--text-dim)">KẾT QUẢ PHÂN TÍCH:</div>';
                 data.results.forEach(matches => {
                     matches.forEach(m => {
                         const confidence = ((1 - m.distance) * 100).toFixed(1);
                         html += `
                             <div class="match-item">
-                                <span class="name">${m.name}</span>
-                                <span class="distance">Độ khớp: ${confidence}%</span>
+                                <span class="name">👤 ${m.name}</span>
+                                <span class="distance-badge">${confidence}% Match</span>
                             </div>
                         `;
                     });
                 });
-                html += '</div>';
                 resultArea.innerHTML = html;
             } else if (data.best_candidate && data.best_candidate.name !== "None") {
                 const conf = ((1 - data.best_candidate.distance) * 100).toFixed(1);
                 resultArea.innerHTML = `
-                    <p style="text-align: center; color: var(--text-dim);">Không tìm thấy ai khớp 100%.</p>
-                    <div style="margin-top:10px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px;">
-                        <p style="font-size: 0.8rem; color: var(--text-dim);">Người gần giống nhất:</p>
+                    <p style="text-align: center; color: var(--text-dim); margin-bottom:15px;">Không tìm thấy kết quả khớp hoàn toàn.</p>
+                    <div style="padding: 16px; background: rgba(255,255,255,0.05); border-radius: 16px;">
+                        <p style="font-size: 0.8rem; color: var(--text-dim); margin-bottom:10px;">Gần giống nhất:</p>
                         <div class="match-item">
                             <span class="name" style="color: var(--text-dim)">${data.best_candidate.name}</span>
-                            <span class="distance">Chỉ khớp: ${conf}%</span>
+                            <span class="distance-badge" style="background:rgba(255,255,255,0.1); color:var(--text-dim)">${conf}%</span>
                         </div>
-                        <p style="font-size: 0.7rem; color: var(--error); margin-top: 5px;">* Cần độ khớp > 70% mới được công nhận.</p>
                     </div>
                 `;
             } else {
-                resultArea.innerHTML = '<p style="text-align: center">Hệ thống không nhận diện được khuôn mặt nào.</p>';
+                resultArea.innerHTML = '<p style="text-align: center; color:var(--text-dim)">Không thể nhận diện bất kỳ khuôn mặt nào trong ảnh này.</p>';
             }
         }
 
-        // DB List
         async function fetchDB() {
             try {
                 const response = await fetch('/db/list');
                 const data = await response.json();
-                
                 let html = '';
                 for (const [name, files] of Object.entries(data.identities)) {
                     html += `
                         <div class="db-item">
-                            <span>${name}</span>
-                            <span class="badge">${files.length} ảnh</span>
+                            <span style="font-weight:500;">${name}</span>
+                            <span class="count-badge">${files.length} items</span>
                         </div>
                     `;
                 }
-                dbList.innerHTML = html || '<p>Trống</p>';
+                dbList.innerHTML = html || '<p style="text-align:center">Database trống</p>';
             } catch (err) {
-                dbList.innerHTML = 'Không thể tải DB';
+                dbList.innerHTML = 'Lỗi tải DB';
             }
         }
 
         async function purgeCache() {
-            if (!confirm('Bạn có chắc muốn xóa cache? Hệ thống sẽ quét lại từ đầu vào lần nhận diện tới.')) return;
+            if (!confirm('Xóa bộ nhớ đệm sẽ khiến hệ thống quét lại toàn bộ Database trong lần tới. Bạn muốn tiếp tục?')) return;
             await fetch('/db/purge-cache');
+            fetchDB();
             alert('Đã xóa cache thành công!');
         }
 
