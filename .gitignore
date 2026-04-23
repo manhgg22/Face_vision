@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+venv/
+ENV/
+
+# DeepFace / FaceID Service
+face_temp_uploads/
+face_db/**/*.pkl
+*.pkl
+
+# IDEs
+.vscode/
+.idea/
+
+# Tháo gỡ các file cũ của DeepFace gốc
+benchmarks/
+boosted/
+experiments/
+tests/
+scripts/
+docker/
+icon/

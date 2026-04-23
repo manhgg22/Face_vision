@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FaceID Pro - Hệ Thống Nhận Diện Khuôn Mặt</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #f8fafc;
+            --text-dim: #94a3b8;
+            --success: #10b981;
+            --error: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 600;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            color: var(--text-dim);
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            margin-bottom: 20px;
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .upload-area {
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        #preview {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            display: none;
+            margin-top: 10px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            background: var(--primary);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #result-area {
+            margin-top: 20px;
+            padding: 16px;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            min-height: 60px;
+            display: none;
+        }
+
+        .match-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .match-item:last-child { border-bottom: none; }
+
+        .name { font-weight: 600; color: var(--success); }
+        .distance { color: var(--text-dim); font-size: 0.875rem; }
+
+        /* DB List */
+        .db-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .badge {
+            background: var(--primary);
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--success);
+            display: inline-block;
+            margin-right: 5px;
+        }
+
+        #loading {
+            display: none;
+            text-align: center;
+            padding: 10px;
+            color: var(--primary);
+        }
+
+        .loader {
+            width: 20px;
+            height: 20px;
+            border: 3px solid #FFF;
+            border-bottom-color: transparent;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+        }
+
+        @keyframes rotation {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>FaceID Intelligence</h1>
+            <p><span class="status-dot"></span> Dịch vụ đang hoạt động tại cổng 8001</p>
+        </header>
+
+        <div class="main-grid">
+            <!-- Left: Recognition -->
+            <div class="card">
+                <h2>🔍 Nhận Diện Danh Tính</h2>
+                <div class="upload-area" id="drop-zone">
+                    <p id="upload-prompt">Kéo thả ảnh vào đây hoặc click để chọn</p>
+                    <img id="preview" alt="Preview">
+                    <input type="file" id="file-input" hidden accept="image/*">
+                </div>
+                <button id="find-btn" class="btn" disabled>Bắt đầu nhận diện</button>
+                
+                <div id="loading">
+                    <span class="loader"></span> Đang xử lý AI (lần đầu sẽ hơi chậm)...
+                </div>
+
+                <div id="result-area"></div>
+            </div>
+
+            <!-- Right: Database Stats -->
+            <div class="card">
+                <h2>📁 Cơ Sở Dữ Liệu</h2>
+                <div id="db-list">
+                    <p style="text-align: center; color: var(--text-dim);">Đang tải danh sách...</p>
+                </div>
+                <hr style="margin: 20px 0; border: 0; border-top: 1px solid rgba(255,255,255,0.1);">
+                <button onclick="purgeCache()" class="btn" style="background: transparent; border: 1px solid var(--text-dim); color: var(--text-dim);">Xóa Cache Hệ Thống</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const preview = document.getElementById('preview');
+        const findBtn = document.getElementById('find-btn');
+        const resultArea = document.getElementById('result-area');
+        const dbList = document.getElementById('db-list');
+        const loading = document.getElementById('loading');
+
+        // Handle Upload
+        dropZone.onclick = () => fileInput.click();
+        fileInput.onchange = (e) => handleFile(e.target.files[0]);
+
+        function handleFile(file) {
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+                document.getElementById('upload-prompt').style.display = 'none';
+                findBtn.disabled = false;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Recognition
+        findBtn.onclick = async () => {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            findBtn.disabled = true;
+            loading.style.display = 'block';
+            resultArea.style.display = 'none';
+
+            try {
+                const response = await fetch('/find', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                showResults(data);
+            } catch (err) {
+                resultArea.innerHTML = `<p style="color: var(--error)">Lỗi kết nối: ${err.message}</p>`;
+                resultArea.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+                findBtn.disabled = false;
+            }
+        };
+
+        function showResults(data) {
+            resultArea.style.display = 'block';
+            
+            if (data.success && data.match_count > 0) {
+                let html = '<strong>✅ Kết quả tìm thấy:</strong><div style="margin-top:10px">';
+                data.results.forEach(matches => {
+                    matches.forEach(m => {
+                        const confidence = ((1 - m.distance) * 100).toFixed(1);
+                        html += `
+                            <div class="match-item">
+                                <span class="name">${m.name}</span>
+                                <span class="distance">Độ khớp: ${confidence}%</span>
+                            </div>
+                        `;
+                    });
+                });
+                html += '</div>';
+                resultArea.innerHTML = html;
+            } else if (data.best_candidate && data.best_candidate.name !== "None") {
+                const conf = ((1 - data.best_candidate.distance) * 100).toFixed(1);
+                resultArea.innerHTML = `
+                    <p style="text-align: center; color: var(--text-dim);">Không tìm thấy ai khớp 100%.</p>
+                    <div style="margin-top:10px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                        <p style="font-size: 0.8rem; color: var(--text-dim);">Người gần giống nhất:</p>
+                        <div class="match-item">
+                            <span class="name" style="color: var(--text-dim)">${data.best_candidate.name}</span>
+                            <span class="distance">Chỉ khớp: ${conf}%</span>
+                        </div>
+                        <p style="font-size: 0.7rem; color: var(--error); margin-top: 5px;">* Cần độ khớp > 70% mới được công nhận.</p>
+                    </div>
+                `;
+            } else {
+                resultArea.innerHTML = '<p style="text-align: center">Hệ thống không nhận diện được khuôn mặt nào.</p>';
+            }
+        }
+
+        // DB List
+        async function fetchDB() {
+            try {
+                const response = await fetch('/db/list');
+                const data = await response.json();
+                
+                let html = '';
+                for (const [name, files] of Object.entries(data.identities)) {
+                    html += `
+                        <div class="db-item">
+                            <span>${name}</span>
+                            <span class="badge">${files.length} ảnh</span>
+                        </div>
+                    `;
+                }
+                dbList.innerHTML = html || '<p>Trống</p>';
+            } catch (err) {
+                dbList.innerHTML = 'Không thể tải DB';
+            }
+        }
+
+        async function purgeCache() {
+            if (!confirm('Bạn có chắc muốn xóa cache? Hệ thống sẽ quét lại từ đầu vào lần nhận diện tới.')) return;
+            await fetch('/db/purge-cache');
+            alert('Đã xóa cache thành công!');
+        }
+
+        fetchDB();
+    </script>
+</body>
+</html>
