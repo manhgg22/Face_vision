@@ -1,25 +1,15 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-.env
+# Python virtual environment
+.venv/
 venv/
-ENV/
+env/
 
-# DeepFace / FaceID Service
-face_temp_uploads/
-face_db/**/*.pkl
+# DeepFace caches
 *.pkl
 
-# IDEs
-.vscode/
-.idea/
+# Uploads and Database
+face_temp_uploads/
+face_db/
 
-# Tháo gỡ các file cũ của DeepFace gốc
-benchmarks/
-boosted/
-experiments/
-tests/
-scripts/
-docker/
-icon/
+# Python cache files
+__pycache__/
+*.pyc

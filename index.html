@@ -53,6 +53,7 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 12px;
+            letter-spacing: -1px;
         }
 
         .status-badge {
@@ -96,101 +97,56 @@
         .upload-area {
             border: 2px dashed rgba(255, 255, 255, 0.15);
             border-radius: 16px;
-            padding: 40px 20px;
+            padding: 60px 20px;
             text-align: center;
             cursor: pointer;
-            transition: all 0.3s;
-            margin-bottom: 12px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-bottom: 24px;
             background: rgba(255, 255, 255, 0.02);
-            position: relative;
         }
 
         .upload-area:hover {
             border-color: var(--primary);
             background: rgba(99, 102, 241, 0.05);
-        }
-
-        #preview-container {
-            position: relative;
-            display: none;
-            max-width: 100%;
-            margin: 0 auto;
+            transform: scale(1.01);
         }
 
         #preview {
             max-width: 100%;
             max-height: 350px;
             border-radius: 12px;
-            display: block;
+            display: none;
+            margin: 0 auto;
             box-shadow: 0 10px 15px rgba(0, 0, 0, 0.3);
         }
 
-        #remove-btn {
-            position: absolute;
-            top: -10px;
-            right: -10px;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background: var(--error);
-            color: white;
-            border: 2px solid var(--card-bg);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 16px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-            z-index: 10;
-        }
-
-        #remove-btn:hover {
-            transform: scale(1.1);
-            filter: brightness(1.2);
-        }
-
-        .url-input-container {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 24px;
-        }
-
-        .input-field {
-            flex: 1;
-            padding: 12px 16px;
-            border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            background: rgba(0, 0, 0, 0.2);
-            color: white;
-            outline: none;
-        }
-
-        .input-field:focus {
-            border-color: var(--primary);
-        }
-
         .btn {
-            padding: 12px 24px;
-            border-radius: 10px;
+            width: 100%;
+            padding: 16px;
+            border-radius: 12px;
             border: none;
             background: var(--gradient);
             color: white;
+            font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
+            box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.3);
         }
 
         .btn:hover {
             transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.4);
             filter: brightness(1.1);
         }
 
         .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+            transform: none;
         }
 
+        /* --- Progress Container --- */
         #progress-container {
             display: none;
             margin-top: 24px;
@@ -210,6 +166,32 @@
             width: 0%;
             background: var(--gradient);
             transition: width 0.4s ease-out;
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        .progress-text {
+            display: flex;
+            justify-content: space-between;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+        }
+
+        #status-message {
+            font-weight: 500;
+            color: var(--primary-light);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.6;
+            }
         }
 
         #result-area {
@@ -218,6 +200,19 @@
             border-radius: 16px;
             background: rgba(0, 0, 0, 0.25);
             display: none;
+            animation: slideUp 0.4s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
         }
 
         .match-item {
@@ -232,6 +227,7 @@
 
         .name {
             font-weight: 600;
+            font-size: 1.1rem;
             color: #fff;
         }
 
@@ -240,16 +236,31 @@
             color: var(--success);
             padding: 4px 12px;
             border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
         }
 
         .db-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px;
+            padding: 14px;
             background: rgba(255, 255, 255, 0.03);
-            border-radius: 10px;
-            margin-bottom: 8px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            transition: 0.2s;
+        }
+
+        .db-item:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .count-badge {
+            background: #334155;
+            color: #cbd5e1;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
         }
     </style>
 </head>
@@ -258,42 +269,33 @@
     <div class="container">
         <header>
             <h1>FaceID Intelligence</h1>
-            <div class="status-badge">ONLINE ✓</div>
+            <div class="status-badge">
+                <span
+                    style="width: 8px; height: 8px; background: var(--success); border-radius: 50%; margin-right: 8px;"></span>
+                Hệ thống đang sẵn sàng
+            </div>
         </header>
 
         <div class="main-grid">
             <div class="card">
-                <h2>🔍 Nhận diện khuôn mặt</h2>
-                <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 20px;">
-                    Mẹo: Nhấn <b>Ctrl + V</b> để dán ảnh đã copy!
-                </p>
-
+                <h2>🔍 Nhận diện danh tính</h2>
                 <div class="upload-area" id="drop-zone">
                     <div id="upload-prompt">
-                        <p>Kéo thả ảnh hoặc click để chọn</p>
+                        <p style="font-size: 1.2rem; margin-bottom: 10px;">Thả ảnh vào đây</p>
+                        <p style="color: var(--text-dim); font-size: 0.9rem;">Hỗ trợ JPG, PNG, WEBP</p>
                     </div>
-                    <div id="preview-container">
-                        <div id="remove-btn" title="Xóa ảnh này">✕</div>
-                        <img id="preview" alt="Preview">
-                    </div>
+                    <img id="preview" alt="Preview">
                     <input type="file" id="file-input" hidden accept="image/*">
                 </div>
 
-                <div class="url-input-container">
-                    <input type="text" id="url-input" class="input-field" placeholder="Dán URL ảnh...">
-                    <button id="url-btn" class="btn">Tải ảnh</button>
-                </div>
-
-                <button id="find-btn" class="btn" style="width: 100%; padding: 16px; font-size: 1.1rem;" disabled>Bắt
-                    đầu phân tích</button>
+                <button id="find-btn" class="btn" disabled>Bắt đầu phân tích</button>
 
                 <div id="progress-container">
                     <div class="progress-bar-bg">
                         <div class="progress-fill" id="progress-fill"></div>
                     </div>
-                    <div
-                        style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-dim);">
-                        <span id="status-message">Đang xử lý...</span>
+                    <div class="progress-text">
+                        <span id="status-message">Đang khởi tạo AI...</span>
                         <span id="percentage-text">0%</span>
                     </div>
                 </div>
@@ -302,172 +304,177 @@
             </div>
 
             <div class="card">
-                <h2>📁 Database</h2>
-                <div id="db-list"></div>
-                <button onclick="purgeCache()" class="btn"
-                    style="margin-top: 20px; width: 100%; background: transparent; border: 1px solid rgba(255,255,255,0.1);">Clear
-                    Cache</button>
+                <h2 style="margin-bottom: 20px;">📁 Danh sách Database</h2>
+                <div id="db-list" style="max-height: 500px; overflow-y: auto; padding-right: 5px;">
+                    <p style="text-align: center; color: var(--text-dim);">Đang tải dữ liệu...</p>
+                </div>
+                <div style="margin-top: 24px;">
+                    <button onclick="purgeCache()" class="btn"
+                        style="background: transparent; border: 1px solid rgba(255,255,255,0.1); font-size: 0.9rem;">
+                        🔄 Làm mới bộ nhớ đệm (Clear Cache)
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
+        const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
         const preview = document.getElementById('preview');
-        const previewContainer = document.getElementById('preview-container');
-        const uploadPrompt = document.getElementById('upload-prompt');
-        const removeBtn = document.getElementById('remove-btn');
         const findBtn = document.getElementById('find-btn');
         const resultArea = document.getElementById('result-area');
+        const dbList = document.getElementById('db-list');
+        const progressContainer = document.getElementById('progress-container');
         const progressFill = document.getElementById('progress-fill');
         const statusMsg = document.getElementById('status-message');
         const percentText = document.getElementById('percentage-text');
-        let selectedFile = null;
 
-        // --- PASTE SUPPORT ---
-        window.addEventListener('paste', e => {
-            const items = e.clipboardData.items;
-            for (let i = 0; i < items.length; i++) {
-                if (items[i].type.indexOf('image') !== -1) {
-                    handleFile(items[i].getAsFile());
-                }
-            }
-        });
+        const STATUS_MESSAGES = [
+            "Đang tải ảnh lên máy chủ...",
+            "Đang dò tìm khuôn mặt (RetinaFace)...",
+            "Đang trích xuất đặc trưng AI...",
+            "Đang đối soát cơ sở dữ liệu...",
+            "Đang tính toán độ trùng khớp...",
+            "Sắp hoàn tất..."
+        ];
 
-        // --- URL SUPPORT ---
-        document.getElementById('url-btn').onclick = async () => {
-            const url = document.getElementById('url-input').value;
-            if (!url) return;
-            try {
-                const res = await fetch(url);
-                const blob = await res.blob();
-                handleFile(new File([blob], "url_image.jpg", { type: blob.type }));
-            } catch (err) { alert("Lỗi tải ảnh từ URL."); }
-        };
-
-        document.getElementById('drop-zone').onclick = (e) => {
-            if (e.target !== removeBtn) fileInput.click();
-        };
-
-        removeBtn.onclick = (e) => {
-            e.stopPropagation();
-            resetUpload();
-        };
-
-        function resetUpload() {
-            selectedFile = null;
-            preview.src = '';
-            previewContainer.style.display = 'none';
-            uploadPrompt.style.display = 'block';
-            findBtn.disabled = true;
-            resultArea.style.display = 'none';
-            document.getElementById('progress-container').style.display = 'none';
-        }
-
+        dropZone.onclick = () => fileInput.click();
         fileInput.onchange = (e) => handleFile(e.target.files[0]);
 
         function handleFile(file) {
             if (!file) return;
-            selectedFile = file;
             const reader = new FileReader();
             reader.onload = (e) => {
                 preview.src = e.target.result;
-                previewContainer.style.display = 'block';
-                uploadPrompt.style.display = 'none';
+                preview.style.display = 'block';
+                document.getElementById('upload-prompt').style.display = 'none';
                 findBtn.disabled = false;
+                resultArea.style.display = 'none';
             };
             reader.readAsDataURL(file);
         }
 
-        findBtn.onclick = async () => {
-            if (!selectedFile) return;
-            const formData = new FormData();
-            formData.append('image', selectedFile);
-            findBtn.disabled = true;
-            document.getElementById('progress-container').style.display = 'block';
+        let progressInterval;
+        function startFakeProgress() {
+            progressContainer.style.display = 'block';
             let progress = 0;
-            const interval = setInterval(() => {
+            let messageIdx = 0;
+
+            progressFill.style.width = '0%';
+            percentText.innerText = '0%';
+            statusMsg.innerText = STATUS_MESSAGES[0];
+
+            progressInterval = setInterval(() => {
                 if (progress < 90) {
-                    progress += (90 - progress) * 0.1;
+                    // Slows down as it gets higher
+                    const inc = progress < 50 ? 5 : (progress < 80 ? 2 : 0.5);
+                    progress += inc;
                     progressFill.style.width = progress + '%';
                     percentText.innerText = Math.round(progress) + '%';
+
+                    // Rotate messages
+                    if (progress % 15 < 1) {
+                        messageIdx = Math.min(messageIdx + 1, STATUS_MESSAGES.length - 1);
+                        statusMsg.innerText = STATUS_MESSAGES[messageIdx];
+                    }
                 }
-            }, 200);
+            }, 150);
+        }
+
+        function finishProgress() {
+            clearInterval(progressInterval);
+            progressFill.style.width = '100%';
+            percentText.innerText = '100%';
+            statusMsg.innerText = 'Hoàn tất!';
+            setTimeout(() => {
+                progressContainer.style.display = 'none';
+            }, 500);
+        }
+
+        findBtn.onclick = async () => {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            findBtn.disabled = true;
+            resultArea.style.display = 'none';
+            startFakeProgress();
 
             try {
-                const res = await fetch('/find', { method: 'POST', body: formData });
-                const data = await res.json();
-                clearInterval(interval);
-                progressFill.style.width = '100%';
-                percentText.innerText = '100%';
+                const response = await fetch('/find', { method: 'POST', body: formData });
+                const data = await response.json();
                 showResults(data);
-            } finally { findBtn.disabled = false; }
+            } catch (err) {
+                resultArea.innerHTML = `<p style="color: var(--error)">Lỗi kết nối: ${err.message}</p>`;
+                resultArea.style.display = 'block';
+            } finally {
+                finishProgress();
+                findBtn.disabled = false;
+            }
         };
 
         function showResults(data) {
             resultArea.style.display = 'block';
             if (data.success && data.match_count > 0) {
-                let html = '<strong>KẾT QUẢ:</strong><br>';
+                let html = '<div style="margin-bottom:15px; font-weight:600; color:var(--text-dim)">KẾT QUẢ PHÂN TÍCH:</div>';
                 data.results.forEach(matches => {
                     matches.forEach(m => {
-                        html += `<div class="match-item"><span class="name">${m.name}</span><span class="distance-badge">${((1 - m.distanc e ) * 100).toFixed(1)
-            }% Match</span ></div > `;
+                        const confidence = ((1 - m.distance) * 100).toFixed(1);
+                        html += `
+                            <div class="match-item">
+                                <span class="name">👤 ${m.name}</span>
+                                <span class="distance-badge">${confidence}% Match</span>
+                            </div>
+                        `;
                     });
                 });
                 resultArea.innerHTML = html;
-            } else { resultArea.innerHTML = 'Không tìm thấy ai khớp.'; }
+            } else if (data.best_candidate && data.best_candidate.name !== "None") {
+                const conf = ((1 - data.best_candidate.distance) * 100).toFixed(1);
+                resultArea.innerHTML = `
+                    <p style="text-align: center; color: var(--text-dim); margin-bottom:15px;">Không tìm thấy kết quả khớp hoàn toàn.</p>
+                    <div style="padding: 16px; background: rgba(255,255,255,0.05); border-radius: 16px;">
+                        <p style="font-size: 0.8rem; color: var(--text-dim); margin-bottom:10px;">Gần giống nhất:</p>
+                        <div class="match-item">
+                            <span class="name" style="color: var(--text-dim)">${data.best_candidate.name}</span>
+                            <span class="distance-badge" style="background:rgba(255,255,255,0.1); color:var(--text-dim)">${conf}%</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                resultArea.innerHTML = '<p style="text-align: center; color:var(--text-dim)">Không thể nhận diện bất kỳ khuôn mặt nào trong ảnh này.</p>';
+            }
         }
-
-        let isIndexing = false;
-        
-        async function checkStatus() {
-            try {
-                const res = await fetch('/db/status');
-                const data = await res.json();
-                isIndexing = data.is_indexing;
-                
-                const banner = document.getElementById('global-indexing-banner');
-                if (isIndexing) {
-                    if (!banner) {
-                        const b = document.createElement('div');
-                        b.id = 'global-indexing-banner';
-                        b.innerHTML = '⚙️ Đang đồng bộ Database ở chế độ chạy ngầm... Vui lòng đợi trong giây lát.';
-                        b.style.cssText = 'background: #fbbf24; color: #000; text-align: center; padding: 10px; font-weight: 600; width: 100%; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); animation: pulse 2s infinite;';
-                        document.querySelector('header').insertAdjacentElement('afterend', b);
-                    }
-                    findBtn.disabled = true;
-                    findBtn.innerText = "Đang đồng bộ dữ liệu...";
-                } else {
-                    if (banner) banner.remove();
-                    findBtn.innerText = "Bắt đầu phân tích";
-                    if (selectedFile) findBtn.disabled = false;
-                }
-            } catch(e) {}
-        }
-        
-        setInterval(checkStatus, 2000);
-        checkStatus();
 
         async function fetchDB() {
-            const res = await fetch('/db/list');
-            const data = await res.json();
-            let html = '';
-            for (const [name, files] of Object.entries(data.identities)) {
-                let badge = `<span>${files.length} ảnh</span>`;
-                if (files.length > 3) {
-                    badge = `<span style="color: #fbbf24; font-size: 0.8rem;" title="Quá nhiều ảnh sẽ làm chậm AI. Hãy chỉ giữ 2-3 ảnh rõ nhất.">⚠️ ${files.length} ảnh (Nên giảm bớt)</span>`;
+            try {
+                const response = await fetch('/db/list');
+                const data = await response.json();
+                let html = '';
+                for (const [name, files] of Object.entries(data.identities)) {
+                    html += `
+                        <div class="db-item">
+                            <span style="font-weight:500;">${name}</span>
+                            <span class="count-badge">${files.length} items</span>
+                        </div>
+                    `;
                 }
-                html += `<div class="db-item"><span>${name}</span>${badge}</div>`;
+                dbList.innerHTML = html || '<p style="text-align:center">Database trống</p>';
+            } catch (err) {
+                dbList.innerHTML = 'Lỗi tải DB';
             }
-            document.getElementById('db-list').innerHTML = html;
         }
-        
+
         async function purgeCache() {
-            if (!confirm("Bấm OK để dọn dẹp và xây dựng lại toàn bộ Index. Hệ thống sẽ tự động làm ngầm!")) return;
+            if (!confirm('Xóa bộ nhớ đệm sẽ khiến hệ thống quét lại toàn bộ Database trong lần tới. Bạn muốn tiếp tục?')) return;
             await fetch('/db/purge-cache');
             fetchDB();
-            checkStatus(); // Cập nhật UI ngay lập tức
+            alert('Đã xóa cache thành công!');
         }
+
         fetchDB();
     </script>
 </body>

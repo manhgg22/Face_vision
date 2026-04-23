@@ -11,6 +11,28 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 import uvicorn
 
+# Tự động nạp thư viện CUDA 11 tải từ pip để TF 2.10 nhận được GPU trên Windows
+import site
+import sys
+import os
+
+site_packages = [p for p in site.getsitepackages() if "site-packages" in p]
+site_packages = site_packages[0] if site_packages else site.getsitepackages()[-1]
+
+cuda_paths = [
+    os.path.join(site_packages, "nvidia", "cuda_runtime", "bin"),
+    os.path.join(site_packages, "nvidia", "cublas", "bin"),
+    os.path.join(site_packages, "nvidia", "cudnn", "bin"),
+]
+for p in cuda_paths:
+    if os.path.exists(p):
+        os.environ["PATH"] = p + os.pathsep + os.environ["PATH"]
+        if hasattr(os, "add_dll_directory"):
+            try:
+                os.add_dll_directory(p)
+            except Exception:
+                pass
+
 # DeepFace import
 from deepface import DeepFace
 import threading
