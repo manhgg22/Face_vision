@@ -16,6 +16,11 @@ import site
 import sys
 import os
 
+# Tối ưu TensorFlow TRƯỚC KHI import
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Giảm logging
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '1'  # Enable oneDNN optimizations
+os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'  # Tối ưu threading
+
 site_packages = [p for p in site.getsitepackages() if "site-packages" in p]
 site_packages = site_packages[0] if site_packages else site.getsitepackages()[-1]
 
@@ -23,7 +28,12 @@ cuda_paths = [
     os.path.join(site_packages, "nvidia", "cuda_runtime", "bin"),
     os.path.join(site_packages, "nvidia", "cublas", "bin"),
     os.path.join(site_packages, "nvidia", "cudnn", "bin"),
+    os.path.join(site_packages, "nvidia", "cufft", "bin"),
+    os.path.join(site_packages, "nvidia", "curand", "bin"),
+    os.path.join(site_packages, "nvidia", "cusolver", "bin"),
+    os.path.join(site_packages, "nvidia", "cusparse", "bin"),
 ]
+
 for p in cuda_paths:
     if os.path.exists(p):
         os.environ["PATH"] = p + os.pathsep + os.environ["PATH"]
@@ -36,6 +46,35 @@ for p in cuda_paths:
 # DeepFace import
 from deepface import DeepFace
 import threading
+import tensorflow as tf
+
+# Kiểm tra trạng thái GPU
+gpus = tf.config.list_physical_devices('GPU')
+DEVICE_STATUS = "🚀 [GPU] NVIDIA RTX ACTIVE" if gpus else "⚠️ [CPU] FALLBACK MODE"
+
+# Configure GPU memory growth to avoid OOM errors
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        tf.config.set_visible_devices(gpus[0], 'GPU')
+        tf.config.optimizer.set_jit(True)  # Enable XLA
+        print(f"\n✅ GPU Memory Growth + XLA enabled")
+    except RuntimeError as e:
+        print(f"GPU config error: {e}")
+
+print("\n" + "="*60)
+print(f"Hệ thống đang sử dụng: {DEVICE_STATUS}")
+print("="*60 + "\n")
+
+# Pre-load model at startup for faster first request
+print("[STARTUP] Pre-loading model...")
+try:
+    from deepface.basemodels import Facenet
+    model = Facenet.loadModel()
+    print(f"[STARTUP] ✅ Model {DEFAULT_MODEL} loaded successfully!")
+except Exception as e:
+    print(f"[STARTUP] ⚠️ Model pre-load failed: {e}")
 
 app = FastAPI(title="FaceID Pro - Fast Index Mode", version="3.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -46,9 +85,10 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 os.makedirs(DB_DIR, exist_ok=True)
 
 # ── Consistent defaults ────────────────────────────────────────────────────────
-# Switch to yolov8 and Facenet for MAX SPEED (under 1s)
-DEFAULT_MODEL    = "Facenet512"
-DEFAULT_DETECTOR = "retinaface"    
+# Optimized for SPEED on GPU
+DEFAULT_MODEL    = "Facenet512"  # Fast and accurate
+DEFAULT_DETECTOR = "skip"        # Skip face detection, use whole image (FASTEST!)
+# Alternative: "opencv" for face detection (faster than retinaface)
 # ──────────────────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
@@ -121,7 +161,7 @@ def build_index_task():
                 enforce_detection=False,
                 silent=True
             )
-            print("[INDEXING] Đã tối ưu xong! Sẵn sàng nhận diện tốc độ cao.")
+            print(f"[{DEVICE_STATUS}] [INDEXING] Đã tối ưu xong! Sẵn sàng nhận diện tốc độ cao.")
         else:
             print("[INDEXING] Database trống.")
     except Exception as e:
@@ -132,7 +172,7 @@ def build_index_task():
 @app.get("/db/status")
 def get_status():
     global is_indexing
-    return {"is_indexing": is_indexing}
+    return {"is_indexing": is_indexing, "device": DEVICE_STATUS}
 
 @app.get("/db/build-index")
 def trigger_build_index(background_tasks: BackgroundTasks):
@@ -170,19 +210,21 @@ async def find_identity(
     try:
         path = save_upload(image)
         print(f"\n{'='*60}")
-        print(f"[SEARCH] Query: {image.filename} -> {path}")
+        print(f"[{DEVICE_STATUS}] [SEARCH] Query: {image.filename} -> {path}")
         print(f"[SEARCH] Model: {model_name} | Detector: {detector_backend}")
 
-        # DeepFace.find
-        # We set silent=False to see DeepFace logs in console
+        # DeepFace.find with optimized settings
+        # silent=True to reduce logging overhead
         dfs = DeepFace.find(
             img_path=path,
             db_path=DB_DIR,
             model_name=model_name,
             detector_backend=detector_backend,
             enforce_detection=False,
-            silent=False,
-            threshold=threshold
+            silent=True,  # Changed to True for speed
+            threshold=threshold,
+            align=True,  # Enable alignment for better accuracy
+            normalization="base"  # Faster normalization
         )
 
         results = []
@@ -220,8 +262,6 @@ async def find_identity(
         else:
             print(f"[DEBUG] No matches meet the threshold.")
             print(f"[DEBUG] Best candidate was: {best_candidate['name']} with distance {best_candidate['distance']:.4f}")
-            if best_candidate['name'] != "None":
-                print(f"        (Suggest: Try increasing threshold or improving image quality)")
 
         return {
             "success": True,
@@ -231,8 +271,71 @@ async def find_identity(
             "debug_info": {
                 "elapsed_seconds": round(elapsed, 2),
                 "model": model_name,
-                "detector": detector_backend
+                "detector": detector_backend,
+                "device": DEVICE_STATUS
             }
+        }
+    except Exception as e:
+        print(f"[ERROR] {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cleanup(path)
+
+@app.post("/find-fast")
+async def find_identity_fast(
+    image: UploadFile = File(...)
+):
+    """Ultra-fast face recognition endpoint - optimized for speed"""
+    path = None
+    start_time = time.time()
+    try:
+        path = save_upload(image)
+        print(f"\n{'='*60}")
+        print(f"[{DEVICE_STATUS}] [FAST-SEARCH] Query: {image.filename}")
+
+        # Ultra-fast settings: skip detector, use cached embeddings
+        dfs = DeepFace.find(
+            img_path=path,
+            db_path=DB_DIR,
+            model_name="Facenet512",
+            detector_backend="skip",  # Skip face detection = FASTEST
+            enforce_detection=False,
+            silent=True,
+            align=False,  # Skip alignment for speed
+            normalization="base"
+        )
+
+        results = []
+        best_match = None
+        best_distance = 1.0
+
+        for df in dfs:
+            if df.empty: continue
+            
+            matches = df.to_dict('records')
+            for match in matches:
+                id_path = match.get('identity', '').replace('/', os.sep).replace('\\', os.sep)
+                parts = id_path.split(os.sep)
+                name = parts[-2] if len(parts) >= 2 else "Unknown"
+                
+                dist = float(match.get('distance', 1.0))
+                if dist < best_distance:
+                    best_distance = dist
+                    best_match = {
+                        "name": name,
+                        "distance": dist,
+                        "confidence": round((1 - dist) * 100, 2)
+                    }
+
+        elapsed = time.time() - start_time
+        
+        print(f"[FAST-RESULT] Best match: {best_match['name'] if best_match else 'None'} in {elapsed:.2f}s")
+
+        return {
+            "success": True,
+            "match": best_match,
+            "elapsed_seconds": round(elapsed, 3),
+            "device": DEVICE_STATUS
         }
     except Exception as e:
         print(f"[ERROR] {traceback.format_exc()}")
