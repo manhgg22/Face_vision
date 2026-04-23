@@ -24,8 +24,8 @@ os.makedirs(DB_DIR, exist_ok=True)
 
 # ── Consistent defaults ────────────────────────────────────────────────────────
 # Switch to yolov8 and Facenet for MAX SPEED (under 1s)
-DEFAULT_MODEL    = "Facenet"   
-DEFAULT_DETECTOR = "ssd"    
+DEFAULT_MODEL    = "Facenet512"
+DEFAULT_DETECTOR = "retinaface"    
 # ──────────────────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
