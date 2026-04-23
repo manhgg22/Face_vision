@@ -6,15 +6,16 @@ import traceback
 import time
 from typing import Optional, List
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 import uvicorn
 
 # DeepFace import
 from deepface import DeepFace
+import threading
 
-app = FastAPI(title="FaceID Pro - Debug Mode", version="2.1.0")
+app = FastAPI(title="FaceID Pro - Fast Index Mode", version="3.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 TEMP_DIR = "face_temp_uploads"
@@ -72,6 +73,53 @@ def purge_pkl_cache():
 def health():
     return {"status": "ok", "model": DEFAULT_MODEL, "detector": DEFAULT_DETECTOR}
 
+# --- BACKGROUND INDEXING ---
+is_indexing = False
+
+def build_index_task():
+    global is_indexing
+    if is_indexing: return
+    is_indexing = True
+    print("\n[INDEXING] Đang quét toàn bộ Database ở chế độ chạy ngầm...")
+    try:
+        sample_img = None
+        for root, dirs, files in os.walk(DB_DIR):
+            for file in files:
+                if file.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
+                    sample_img = os.path.join(root, file)
+                    break
+            if sample_img: break
+            
+        if sample_img:
+            DeepFace.find(
+                img_path=sample_img,
+                db_path=DB_DIR,
+                model_name=DEFAULT_MODEL,
+                detector_backend=DEFAULT_DETECTOR,
+                enforce_detection=False,
+                silent=True
+            )
+            print("[INDEXING] Đã tối ưu xong! Sẵn sàng nhận diện tốc độ cao.")
+        else:
+            print("[INDEXING] Database trống.")
+    except Exception as e:
+        print(f"[INDEXING ERROR] {e}")
+    finally:
+        is_indexing = False
+
+@app.get("/db/status")
+def get_status():
+    global is_indexing
+    return {"is_indexing": is_indexing}
+
+@app.get("/db/build-index")
+def trigger_build_index(background_tasks: BackgroundTasks):
+    global is_indexing
+    if is_indexing:
+        return {"status": "already_running"}
+    background_tasks.add_task(build_index_task)
+    return {"status": "started"}
+
 @app.get("/db/list")
 def list_db():
     identities = {}
@@ -82,9 +130,10 @@ def list_db():
     return {"identities": identities}
 
 @app.get("/db/purge-cache")
-def purge_cache():
+def purge_cache(background_tasks: BackgroundTasks):
     count = purge_pkl_cache()
     print(f"[CACHE] Purged {count} pkl files.")
+    background_tasks.add_task(build_index_task) # Tự động quét lại luôn
     return {"success": True, "deleted": count}
 
 @app.post("/find")
