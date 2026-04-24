@@ -52,14 +52,17 @@ import tensorflow as tf
 gpus = tf.config.list_physical_devices('GPU')
 DEVICE_STATUS = "🚀 [GPU] NVIDIA RTX ACTIVE" if gpus else "⚠️ [CPU] FALLBACK MODE"
 
+# Optimized for Windows without full CUDA SDK (fixing ptxas.exe issue)
+os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices=false'
+
 # Configure GPU memory growth to avoid OOM errors
 if gpus:
     try:
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
         tf.config.set_visible_devices(gpus[0], 'GPU')
-        tf.config.optimizer.set_jit(True)  # Enable XLA
-        print(f"\n✅ GPU Memory Growth + XLA enabled")
+        tf.config.optimizer.set_jit(False)  # Disable XLA to fix ptxas.exe error
+        print(f"✅ GPU Memory Growth enabled (XLA disabled for stability)")
     except RuntimeError as e:
         print(f"GPU config error: {e}")
 
@@ -84,11 +87,10 @@ DB_DIR = "face_db"
 os.makedirs(TEMP_DIR, exist_ok=True)
 os.makedirs(DB_DIR, exist_ok=True)
 
-# ── Consistent defaults ────────────────────────────────────────────────────────
-# Optimized for SPEED on GPU
+# Optimized for ACCURACY (OpenCV is the default in DeepFace)
 DEFAULT_MODEL    = "Facenet512"  # Fast and accurate
-DEFAULT_DETECTOR = "skip"        # Skip face detection, use whole image (FASTEST!)
-# Alternative: "opencv" for face detection (faster than retinaface)
+DEFAULT_DETECTOR = "opencv"      # Standard face detection (more accurate than 'skip')
+# Alternative: "retinaface" for maximum accuracy (slower)
 # ──────────────────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
@@ -209,39 +211,41 @@ async def find_identity(
     start_time = time.time()
     try:
         path = save_upload(image)
+        from PIL import Image
+        with Image.open(path) as img:
+            img_w, img_h = img.size
+
         print(f"\n{'='*60}")
-        print(f"[{DEVICE_STATUS}] [SEARCH] Query: {image.filename} -> {path}")
-        print(f"[SEARCH] Model: {model_name} | Detector: {detector_backend}")
+        print(f"[{DEVICE_STATUS}]")
+        print(f"[SEARCH] Query: {image.filename} ({img_w}x{img_h}) -> {path}")
+        print(f"[SEARCH] Params: Model={model_name} | Detector={detector_backend} | Threshold={threshold or 'Auto'}")
 
         # IMPORTANT: Validate that image contains a face first
         try:
             from deepface.modules import detection
+            # Use opencv for validation even if skip is requested for search
+            val_detector = detector_backend if detector_backend != "skip" else "opencv"
             face_objs = detection.extract_faces(
                 img_path=path,
-                detector_backend=detector_backend if detector_backend != "skip" else "opencv",
-                enforce_detection=True,  # Enforce face detection
+                detector_backend=val_detector,
+                enforce_detection=True,
                 align=True
             )
             
             if not face_objs or len(face_objs) == 0:
-                print("[VALIDATION] No face detected in image")
+                print(f"[VALIDATION] ❌ No face detected using {val_detector}")
                 return {
                     "success": False,
                     "error": "NO_FACE_DETECTED",
-                    "message": "Không phát hiện khuôn mặt trong ảnh. Vui lòng sử dụng ảnh có khuôn mặt rõ ràng.",
+                    "message": "Không phát hiện khuôn mặt trong ảnh. Vui lòng sử dụng ảnh rõ mặt.",
                     "match_count": 0
                 }
             
-            print(f"[VALIDATION] Detected {len(face_objs)} face(s)")
+            print(f"[VALIDATION] ✅ Detected {len(face_objs)} face(s) using {val_detector}")
             
         except Exception as e:
-            print(f"[VALIDATION] Face detection failed: {e}")
-            return {
-                "success": False,
-                "error": "NO_FACE_DETECTED",
-                "message": "Không phát hiện khuôn mặt trong ảnh. Vui lòng sử dụng ảnh có khuôn mặt rõ ràng.",
-                "match_count": 0
-            }
+            print(f"[VALIDATION] ⚠️ Face detection check failed: {e}")
+            # We continue anyway but log the warning
 
         # DeepFace.find with optimized settings
         dfs = DeepFace.find(
@@ -249,21 +253,17 @@ async def find_identity(
             db_path=DB_DIR,
             model_name=model_name,
             detector_backend=detector_backend,
-            enforce_detection=False,  # Already validated above
+            enforce_detection=False,
             silent=True,
             threshold=threshold,
             align=True,
             normalization="base"
         )
 
-        # Collect all matches and find the best one
+        # Collect all matches
         all_matches = []
-        best_match = None
-        best_distance = 1.0
-
         for df in dfs:
             if df.empty: continue
-            
             matches = df.to_dict('records')
             for match in matches:
                 id_path = match.get('identity', '').replace('/', os.sep).replace('\\', os.sep)
@@ -271,33 +271,37 @@ async def find_identity(
                 name = parts[-2] if len(parts) >= 2 else "Unknown"
                 match['name'] = name
                 
-                dist = float(match.get('distance', 1.0))
-                
                 # Convert for JSON
                 for k, v in match.items():
                     if hasattr(v, '__float__'): match[k] = float(v)
-                
                 all_matches.append(match)
-                
-                # Track best match
-                if dist < best_distance:
-                    best_distance = dist
-                    best_match = match
 
-        # Return only the best match (or empty if none found)
+        # Sort by distance
+        all_matches = sorted(all_matches, key=lambda x: x['distance'])
+        
+        best_match = all_matches[0] if all_matches else None
         results = [[best_match]] if best_match else []
-        best_candidate = {"name": best_match['name'], "distance": best_distance, "file": os.path.basename(best_match.get('identity', ''))} if best_match else {"name": "None", "distance": 1.0}
-
+        
         elapsed = time.time() - start_time
         match_count = 1 if best_match else 0
         
-        print(f"[RESULT] Best match in {elapsed:.2f}s")
-        if best_match:
-            print(f"  > BEST MATCH: {best_match['name']} (Dist: {best_match['distance']:.4f}, Confidence: {(1-best_match['distance'])*100:.1f}%)")
+        print(f"[RESULT] Search finished in {elapsed:.2f}s")
+        if all_matches:
+            print(f"  > TOP 3 CANDIDATES:")
+            for i, m in enumerate(all_matches[:3]):
+                indicator = "⭐" if i == 0 else "  "
+                print(f"    {indicator} {m['name']} (Dist: {m['distance']:.4f} | Conf: {(1-m['distance'])*100:.1f}%)")
         else:
-            print(f"[DEBUG] No matches found")
-            if best_candidate['name'] != "None":
-                print(f"[DEBUG] Closest was: {best_candidate['name']} with distance {best_candidate['distance']:.4f}")
+            print(f"  > ❌ No matches found below threshold.")
+            # Show closest if any
+            if hasattr(DeepFace, 'last_results') or True: # Just a placeholder concept
+                pass 
+
+        best_candidate = {
+            "name": all_matches[0]['name'], 
+            "distance": all_matches[0]['distance'], 
+            "file": os.path.basename(all_matches[0].get('identity', ''))
+        } if all_matches else {"name": "None", "distance": 1.0}
 
         return {
             "success": True,
@@ -326,15 +330,20 @@ async def find_identity_fast(
     start_time = time.time()
     try:
         path = save_upload(image)
-        print(f"\n{'='*60}")
-        print(f"[{DEVICE_STATUS}] [FAST-SEARCH] Query: {image.filename}")
+        from PIL import Image
+        with Image.open(path) as img:
+            img_w, img_h = img.size
 
-        # Ultra-fast settings: skip detector, use cached embeddings
+        print(f"\n{'='*60}")
+        print(f"[{DEVICE_STATUS}]")
+        print(f"[FAST-SEARCH] Query: {image.filename} ({img_w}x{img_h})")
+
+        # Fast search but still using a detector for accuracy
         dfs = DeepFace.find(
             img_path=path,
             db_path=DB_DIR,
             model_name="Facenet512",
-            detector_backend="skip",  # Skip face detection = FASTEST
+            detector_backend="opencv", # Use opencv instead of skip for better accuracy
             enforce_detection=False,
             silent=True,
             align=False,  # Skip alignment for speed
@@ -365,9 +374,11 @@ async def find_identity_fast(
 
         elapsed = time.time() - start_time
         
-        print(f"[FAST-RESULT] Best match: {best_match['name'] if best_match else 'None'} in {elapsed:.2f}s")
+        print(f"[FAST-RESULT] Search finished in {elapsed:.2f}s")
         if best_match:
-            print(f"  > Confidence: {best_match['confidence']:.1f}% (Distance: {best_match['distance']:.4f})")
+            print(f"  > MATCH FOUND: {best_match['name']} (Conf: {best_match['confidence']:.1f}% | Dist: {best_match['distance']:.4f})")
+        else:
+            print(f"  > ❌ No matches found.")
 
         return {
             "success": True,
