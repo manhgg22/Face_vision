@@ -213,22 +213,53 @@ async def find_identity(
         print(f"[{DEVICE_STATUS}] [SEARCH] Query: {image.filename} -> {path}")
         print(f"[SEARCH] Model: {model_name} | Detector: {detector_backend}")
 
+        # IMPORTANT: Validate that image contains a face first
+        try:
+            from deepface.modules import detection
+            face_objs = detection.extract_faces(
+                img_path=path,
+                detector_backend=detector_backend if detector_backend != "skip" else "opencv",
+                enforce_detection=True,  # Enforce face detection
+                align=True
+            )
+            
+            if not face_objs or len(face_objs) == 0:
+                print("[VALIDATION] No face detected in image")
+                return {
+                    "success": False,
+                    "error": "NO_FACE_DETECTED",
+                    "message": "Không phát hiện khuôn mặt trong ảnh. Vui lòng sử dụng ảnh có khuôn mặt rõ ràng.",
+                    "match_count": 0
+                }
+            
+            print(f"[VALIDATION] Detected {len(face_objs)} face(s)")
+            
+        except Exception as e:
+            print(f"[VALIDATION] Face detection failed: {e}")
+            return {
+                "success": False,
+                "error": "NO_FACE_DETECTED",
+                "message": "Không phát hiện khuôn mặt trong ảnh. Vui lòng sử dụng ảnh có khuôn mặt rõ ràng.",
+                "match_count": 0
+            }
+
         # DeepFace.find with optimized settings
-        # silent=True to reduce logging overhead
         dfs = DeepFace.find(
             img_path=path,
             db_path=DB_DIR,
             model_name=model_name,
             detector_backend=detector_backend,
-            enforce_detection=False,
-            silent=True,  # Changed to True for speed
+            enforce_detection=False,  # Already validated above
+            silent=True,
             threshold=threshold,
-            align=True,  # Enable alignment for better accuracy
-            normalization="base"  # Faster normalization
+            align=True,
+            normalization="base"
         )
 
-        results = []
-        best_candidate = {"name": "None", "distance": 1.0}
+        # Collect all matches and find the best one
+        all_matches = []
+        best_match = None
+        best_distance = 1.0
 
         for df in dfs:
             if df.empty: continue
@@ -240,28 +271,33 @@ async def find_identity(
                 name = parts[-2] if len(parts) >= 2 else "Unknown"
                 match['name'] = name
                 
-                # Tracking best overall candidate (even if above threshold)
                 dist = float(match.get('distance', 1.0))
-                if dist < best_candidate['distance']:
-                    best_candidate = {"name": name, "distance": dist, "file": os.path.basename(id_path)}
                 
                 # Convert for JSON
                 for k, v in match.items():
                     if hasattr(v, '__float__'): match[k] = float(v)
-            
-            results.append(matches)
+                
+                all_matches.append(match)
+                
+                # Track best match
+                if dist < best_distance:
+                    best_distance = dist
+                    best_match = match
+
+        # Return only the best match (or empty if none found)
+        results = [[best_match]] if best_match else []
+        best_candidate = {"name": best_match['name'], "distance": best_distance, "file": os.path.basename(best_match.get('identity', ''))} if best_match else {"name": "None", "distance": 1.0}
 
         elapsed = time.time() - start_time
-        match_count = sum(len(r) for r in results)
+        match_count = 1 if best_match else 0
         
-        print(f"[RESULT] Found {match_count} matches in {elapsed:.2f}s")
-        if match_count > 0:
-            for r in results:
-                for m in r:
-                    print(f"  > MATCH: {m['name']} (Dist: {m['distance']:.4f})")
+        print(f"[RESULT] Best match in {elapsed:.2f}s")
+        if best_match:
+            print(f"  > BEST MATCH: {best_match['name']} (Dist: {best_match['distance']:.4f}, Confidence: {(1-best_match['distance'])*100:.1f}%)")
         else:
-            print(f"[DEBUG] No matches meet the threshold.")
-            print(f"[DEBUG] Best candidate was: {best_candidate['name']} with distance {best_candidate['distance']:.4f}")
+            print(f"[DEBUG] No matches found")
+            if best_candidate['name'] != "None":
+                print(f"[DEBUG] Closest was: {best_candidate['name']} with distance {best_candidate['distance']:.4f}")
 
         return {
             "success": True,
@@ -330,10 +366,13 @@ async def find_identity_fast(
         elapsed = time.time() - start_time
         
         print(f"[FAST-RESULT] Best match: {best_match['name'] if best_match else 'None'} in {elapsed:.2f}s")
+        if best_match:
+            print(f"  > Confidence: {best_match['confidence']:.1f}% (Distance: {best_match['distance']:.4f})")
 
         return {
             "success": True,
             "match": best_match,
+            "match_count": 1 if best_match else 0,
             "elapsed_seconds": round(elapsed, 3),
             "device": DEVICE_STATUS
         }

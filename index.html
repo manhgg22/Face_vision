@@ -469,19 +469,58 @@
 
         function showResults(data) {
             resultArea.style.display = 'block';
-            if (data.success && data.match_count > 0) {
+
+            // Handle error cases
+            if (!data.success) {
+                if (data.error === "NO_FACE_DETECTED") {
+                    resultArea.innerHTML = `
+                        <div style="text-align: center; padding: 20px;">
+                            <div style="font-size: 3rem; margin-bottom: 10px;">⚠️</div>
+                            <p style="color: var(--error); font-weight: 600; font-size: 1.1rem; margin-bottom: 10px;">
+                                Không phát hiện khuôn mặt
+                            </p>
+                            <p style="color: var(--text-dim); font-size: 0.9rem;">
+                                ${data.message || 'Vui lòng sử dụng ảnh có khuôn mặt rõ ràng'}
+                            </p>
+                        </div>
+                    `;
+                } else {
+                    resultArea.innerHTML = `
+                        <p style="color: var(--error); text-align: center;">
+                            ❌ Lỗi: ${data.message || 'Đã xảy ra lỗi không xác định'}
+                        </p>
+                    `;
+                }
+                return;
+            }
+
+            if (data.success && data.match_count > 0 && data.results.length > 0) {
+                // Get the best match (should only be one now)
+                const bestMatch = data.results[0][0];
+                const confidence = ((1 - bestMatch.distance) * 100).toFixed(1);
+
                 let html = '<div style="margin-bottom:15px; font-weight:600; color:var(--text-dim)">KẾT QUẢ PHÂN TÍCH:</div>';
-                data.results.forEach(matches => {
-                    matches.forEach(m => {
-                        const confidence = ((1 - m.distance) * 100).toFixed(1);
-                        html += `
-                            <div class="match-item">
-                                <span class="name">👤 ${m.name}</span>
-                                <span class="distance-badge">${confidence}% Match</span>
-                            </div>
-                        `;
-                    });
-                });
+                html += `
+                    <div class="match-item" style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3);">
+                        <span class="name" style="font-size: 1.3rem;">👤 ${bestMatch.name}</span>
+                        <span class="distance-badge" style="font-size: 1.1rem; padding: 8px 16px;">${confidence}% Match</span>
+                    </div>
+                `;
+
+                // Show additional info
+                html += `
+                    <div style="margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; font-size: 0.85rem; color: var(--text-dim);">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                            <span>Distance Score:</span>
+                            <span style="font-family: monospace;">${bestMatch.distance.toFixed(4)}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Processing Time:</span>
+                            <span>${data.debug_info?.elapsed_seconds || 'N/A'}s</span>
+                        </div>
+                    </div>
+                `;
+
                 resultArea.innerHTML = html;
             } else if (data.best_candidate && data.best_candidate.name !== "None") {
                 const conf = ((1 - data.best_candidate.distance) * 100).toFixed(1);
