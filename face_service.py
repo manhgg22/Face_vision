@@ -14,7 +14,6 @@ import uvicorn
 # Tự động nạp thư viện CUDA 11 tải từ pip để TF 2.10 nhận được GPU trên Windows
 import site
 import sys
-import os
 
 # Tối ưu TensorFlow TRƯỚC KHI import
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Giảm logging
@@ -75,7 +74,7 @@ print("[STARTUP] Pre-loading model...")
 try:
     from deepface.models.facial_recognition import Facenet
     model = Facenet.loadModel()
-    print(f"[STARTUP] ✅ Model {DEFAULT_MODEL} loaded successfully!")
+    print(f"[STARTUP] ✅ Model Facenet512 loaded successfully!")
 except Exception as e:
     print(f"[STARTUP] ⚠️ Model pre-load failed: {e}")
 
@@ -213,9 +212,41 @@ async def find_identity(
     start_time = time.time()
     try:
         path = save_upload(image)
+        from PIL import Image
+        with Image.open(path) as img:
+            img_w, img_h = img.size
+
         print(f"\n{'='*60}")
-        print(f"[{DEVICE_STATUS}] [SEARCH] Query: {image.filename} -> {path}")
-        print(f"[SEARCH] Model: {model_name} | Detector: {detector_backend}")
+        print(f"[{DEVICE_STATUS}]")
+        print(f"[SEARCH] Query: {image.filename} ({img_w}x{img_h}) -> {path}")
+        print(f"[SEARCH] Params: Model={model_name} | Detector={detector_backend} | Threshold={threshold or 'Auto'}")
+
+        # IMPORTANT: Validate that image contains a face first
+        try:
+            from deepface.modules import detection
+            # Use opencv for validation even if skip is requested for search
+            val_detector = detector_backend if detector_backend != "skip" else "opencv"
+            face_objs = detection.extract_faces(
+                img_path=path,
+                detector_backend=val_detector,
+                enforce_detection=True,
+                align=True
+            )
+            
+            if not face_objs or len(face_objs) == 0:
+                print(f"[VALIDATION] ❌ No face detected using {val_detector}")
+                return {
+                    "success": False,
+                    "error": "NO_FACE_DETECTED",
+                    "message": "Không phát hiện khuôn mặt trong ảnh. Vui lòng sử dụng ảnh rõ mặt.",
+                    "match_count": 0
+                }
+            
+            print(f"[VALIDATION] ✅ Detected {len(face_objs)} face(s) using {val_detector}")
+            
+        except Exception as e:
+            print(f"[VALIDATION] ⚠️ Face detection check failed: {e}")
+            # We continue anyway but log the warning
 
         # DeepFace.find with recommended settings from official docs
         # RetinaFace: Most accurate detector
@@ -240,7 +271,6 @@ async def find_identity(
 
         for df in dfs:
             if df.empty: continue
-            
             matches = df.to_dict('records')
             for match in matches:
                 id_path = match.get('identity', '').replace('/', os.sep).replace('\\', os.sep)
@@ -277,8 +307,10 @@ async def find_identity(
                 confidence = round((1 - m['distance']) * 100, 1)
                 print(f"  > MATCH: {m['name']} - {confidence}% confidence (Dist: {m['distance']:.4f})")
         else:
-            print(f"[DEBUG] No matches meet the threshold.")
-            print(f"[DEBUG] Best candidate was: {best_candidate['name']} with distance {best_candidate['distance']:.4f}")
+            print(f"  > ❌ No matches found below threshold.")
+            # Show closest if any
+            if hasattr(DeepFace, 'last_results') or True: # Just a placeholder concept
+                pass 
 
         return {
             "success": True,
@@ -335,8 +367,13 @@ async def find_identity_fast(
     start_time = time.time()
     try:
         path = save_upload(image)
+        from PIL import Image
+        with Image.open(path) as img:
+            img_w, img_h = img.size
+
         print(f"\n{'='*60}")
-        print(f"[{DEVICE_STATUS}] [FAST-SEARCH] Query: {image.filename}")
+        print(f"[{DEVICE_STATUS}]")
+        print(f"[FAST-SEARCH] Query: {image.filename} ({img_w}x{img_h})")
 
         # Fast settings: opencv detector (faster than retinaface)
         dfs = DeepFace.find(

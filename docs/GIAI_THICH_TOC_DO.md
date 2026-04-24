@@ -87,6 +87,13 @@ detector_backend = "opencv"  # Detector nhanh, vẫn chính xác
 **Ưu điểm:** Nhanh hơn RetinaFace 2-3x, vẫn detect face tốt
 **Nhược điểm:** Kém chính xác hơn RetinaFace một chút
 
+#### Option B: Skip Detector (Nhanh Nhất - 1-2 giây)
+```python
+detector_backend = "skip"  # Bỏ qua face detection
+```
+**Ưu điểm:** Nhanh nhất (1-2s)
+**Nhược điểm:** Cần ảnh đã crop sẵn khuôn mặt, nếu không sẽ lỗi hoặc kém chính xác.
+
 ### ⚡ Giải Pháp 2: Dùng Endpoint Tối Ưu
 
 Service đã có endpoint `/find-fast` được tối ưu:
@@ -98,7 +105,6 @@ POST http://localhost:8001/find
 // Dùng
 POST http://localhost:8001/find-fast
 ```
-
 **Tốc độ:** 4-6 giây (nhanh hơn 2-3x)
 
 ### 🎯 Giải Pháp 3: Giảm Số Ảnh Trong Database
@@ -107,6 +113,22 @@ Nếu có thể, chỉ giữ 1-2 ảnh tốt nhất cho mỗi người:
 - Hiện tại: 34 ảnh / 12 người = 2.8 ảnh/người
 - Tối ưu: 1 ảnh/người = 12 ảnh total
 - **Tốc độ tăng:** ~3x nhanh hơn
+
+### 🔧 Giải Pháp 4: Tối Ưu Code Frontend
+
+Nếu dùng cho FaceID/Unlock, gửi request với settings tối ưu:
+
+```javascript
+const formData = new FormData();
+formData.append('image', imageFile);
+formData.append('model_name', 'Facenet512');
+formData.append('detector_backend', 'opencv');  // Dùng OpenCV thay vì RetinaFace
+
+const response = await fetch('http://localhost:8001/find', {
+    method: 'POST',
+    body: formData
+});
+```
 
 ## 📈 So Sánh Hiệu Suất
 
@@ -133,6 +155,13 @@ detector_backend = "retinaface"
 POST /find-fast
 detector_backend = "opencv"
 // Tốc độ: 4-6 giây, độ chính xác: VẪN CAO
+```
+
+### Cho Tốc Độ Tối Đa (Nếu Ảnh Đã Đẹp):
+```javascript
+POST /find
+detector_backend = "skip"
+// Tốc độ: 1-2 giây
 ```
 
 ## 🧪 Test Ngay
