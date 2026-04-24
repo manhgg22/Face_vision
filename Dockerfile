@@ -27,11 +27,11 @@ RUN apt-get update && apt-get install -y \
 # Copy required files from repo into image
 COPY ./deepface /app/deepface
 # even though we will use local requirements, this one is required to perform install deepface from source code
-COPY ./requirements.txt /app/requirements.txt
-COPY ./requirements_local /app/requirements_local.txt
+COPY ./requirements/requirements.txt /app/requirements.txt
+COPY ./requirements/requirements_local.txt /app/requirements_local.txt
 COPY ./package_info.json /app/
 COPY ./setup.py /app/
-COPY ./README.md /app/
+COPY ./docs/README.md /app/README.md
 COPY ./entrypoint.sh /app/deepface/api/src/entrypoint.sh
 
 # -----------------------------------

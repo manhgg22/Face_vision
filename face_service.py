@@ -52,14 +52,17 @@ import tensorflow as tf
 gpus = tf.config.list_physical_devices('GPU')
 DEVICE_STATUS = "🚀 [GPU] NVIDIA RTX ACTIVE" if gpus else "⚠️ [CPU] FALLBACK MODE"
 
+# Optimized for Windows without full CUDA SDK (fixing ptxas.exe issue)
+os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices=false'
+
 # Configure GPU memory growth to avoid OOM errors
 if gpus:
     try:
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
         tf.config.set_visible_devices(gpus[0], 'GPU')
-        tf.config.optimizer.set_jit(True)  # Enable XLA
-        print(f"\n✅ GPU Memory Growth + XLA enabled")
+        tf.config.optimizer.set_jit(False)  # Disable XLA to fix ptxas.exe error
+        print(f"✅ GPU Memory Growth enabled (XLA disabled for stability)")
     except RuntimeError as e:
         print(f"GPU config error: {e}")
 
@@ -70,7 +73,7 @@ print("="*60 + "\n")
 # Pre-load model at startup for faster first request
 print("[STARTUP] Pre-loading model...")
 try:
-    from deepface.basemodels import Facenet
+    from deepface.models.facial_recognition import Facenet
     model = Facenet.loadModel()
     print(f"[STARTUP] ✅ Model {DEFAULT_MODEL} loaded successfully!")
 except Exception as e:
@@ -85,16 +88,17 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 os.makedirs(DB_DIR, exist_ok=True)
 
 # ── Consistent defaults ────────────────────────────────────────────────────────
-# Optimized for SPEED on GPU
-DEFAULT_MODEL    = "Facenet512"  # Fast and accurate
-DEFAULT_DETECTOR = "skip"        # Skip face detection, use whole image (FASTEST!)
-# Alternative: "opencv" for face detection (faster than retinaface)
+# Following DeepFace official documentation for ACCURACY
+# Benchmark: https://github.com/serengil/deepface
+DEFAULT_MODEL    = "Facenet512"  # 98.4% accuracy - highest measured score
+DEFAULT_DETECTOR = "retinaface"  # Most accurate detector (recommended by DeepFace)
+# Alternative detectors: "mtcnn" (accurate), "opencv" (fast), "skip" (fastest)
 # ──────────────────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
 def get_dashboard():
-    if os.path.exists("index.html"):
-        with open("index.html", "r", encoding="utf-8") as f:
+    if os.path.exists("web/index.html"):
+        with open("web/index.html", "r", encoding="utf-8") as f:
             return f.read()
     return "<h1>Dashboard file not found.</h1>"
 
@@ -213,21 +217,25 @@ async def find_identity(
         print(f"[{DEVICE_STATUS}] [SEARCH] Query: {image.filename} -> {path}")
         print(f"[SEARCH] Model: {model_name} | Detector: {detector_backend}")
 
-        # DeepFace.find with optimized settings
-        # silent=True to reduce logging overhead
+        # DeepFace.find with recommended settings from official docs
+        # RetinaFace: Most accurate detector
+        # align=True: Better accuracy (recommended)
+        # enforce_detection=True: Ensure face is detected
         dfs = DeepFace.find(
             img_path=path,
             db_path=DB_DIR,
             model_name=model_name,
             detector_backend=detector_backend,
-            enforce_detection=False,
-            silent=True,  # Changed to True for speed
+            enforce_detection=True,  # Changed to True for accuracy
+            silent=False,  # Show logs for debugging
             threshold=threshold,
             align=True,  # Enable alignment for better accuracy
-            normalization="base"  # Faster normalization
+            normalization="base"  # Standard normalization
         )
 
-        results = []
+        # Dictionary to track best match per person (lowest distance = highest confidence)
+        best_matches_per_person = {}
+        all_matches = []
         best_candidate = {"name": "None", "distance": 1.0}
 
         for df in dfs:
@@ -240,25 +248,34 @@ async def find_identity(
                 name = parts[-2] if len(parts) >= 2 else "Unknown"
                 match['name'] = name
                 
-                # Tracking best overall candidate (even if above threshold)
-                dist = float(match.get('distance', 1.0))
-                if dist < best_candidate['distance']:
-                    best_candidate = {"name": name, "distance": dist, "file": os.path.basename(id_path)}
-                
                 # Convert for JSON
                 for k, v in match.items():
                     if hasattr(v, '__float__'): match[k] = float(v)
-            
-            results.append(matches)
+                
+                dist = float(match.get('distance', 1.0))
+                
+                # Track best overall candidate
+                if dist < best_candidate['distance']:
+                    best_candidate = {"name": name, "distance": dist, "file": os.path.basename(id_path)}
+                
+                # Keep only the best match per person (lowest distance)
+                if name not in best_matches_per_person or dist < best_matches_per_person[name]['distance']:
+                    best_matches_per_person[name] = match
+                
+                all_matches.append(match)
+        
+        # Convert best matches to list and sort by distance (best first)
+        results = sorted(best_matches_per_person.values(), key=lambda x: x['distance'])
 
         elapsed = time.time() - start_time
-        match_count = sum(len(r) for r in results)
+        total_matches = len(all_matches)
+        unique_matches = len(results)
         
-        print(f"[RESULT] Found {match_count} matches in {elapsed:.2f}s")
-        if match_count > 0:
-            for r in results:
-                for m in r:
-                    print(f"  > MATCH: {m['name']} (Dist: {m['distance']:.4f})")
+        print(f"[RESULT] Found {total_matches} total matches ({unique_matches} unique people) in {elapsed:.2f}s")
+        if unique_matches > 0:
+            for m in results:
+                confidence = round((1 - m['distance']) * 100, 1)
+                print(f"  > MATCH: {m['name']} - {confidence}% confidence (Dist: {m['distance']:.4f})")
         else:
             print(f"[DEBUG] No matches meet the threshold.")
             print(f"[DEBUG] Best candidate was: {best_candidate['name']} with distance {best_candidate['distance']:.4f}")
@@ -266,18 +283,46 @@ async def find_identity(
         return {
             "success": True,
             "results": results,
-            "match_count": match_count,
-            "best_candidate": best_candidate if match_count == 0 else None,
+            "match_count": unique_matches,
+            "total_matches": total_matches,
+            "best_candidate": best_candidate if unique_matches == 0 else None,
             "debug_info": {
                 "elapsed_seconds": round(elapsed, 2),
                 "model": model_name,
                 "detector": detector_backend,
-                "device": DEVICE_STATUS
+                "device": DEVICE_STATUS,
+                "note": f"Showing best match per person (filtered {total_matches - unique_matches} duplicates)"
             }
         }
     except Exception as e:
+        elapsed = time.time() - start_time
+        error_msg = str(e)
+        
+        # Check if it's a face detection error
+        if "Face could not be detected" in error_msg or "FaceNotDetected" in str(type(e).__name__):
+            print(f"[WARNING] No face detected in {image.filename}")
+            return {
+                "success": False,
+                "error": "NO_FACE_DETECTED",
+                "message": "Không phát hiện khuôn mặt trong ảnh. Vui lòng chụp lại ảnh có khuôn mặt rõ ràng.",
+                "details": {
+                    "filename": image.filename,
+                    "detector": detector_backend,
+                    "elapsed_seconds": round(elapsed, 2)
+                }
+            }
+        
+        # Other errors
         print(f"[ERROR] {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return {
+            "success": False,
+            "error": "PROCESSING_ERROR",
+            "message": f"Lỗi xử lý ảnh: {error_msg}",
+            "details": {
+                "filename": image.filename,
+                "elapsed_seconds": round(elapsed, 2)
+            }
+        }
     finally:
         cleanup(path)
 
@@ -285,7 +330,7 @@ async def find_identity(
 async def find_identity_fast(
     image: UploadFile = File(...)
 ):
-    """Ultra-fast face recognition endpoint - optimized for speed"""
+    """Fast face recognition endpoint - uses opencv detector for speed"""
     path = None
     start_time = time.time()
     try:
@@ -293,53 +338,90 @@ async def find_identity_fast(
         print(f"\n{'='*60}")
         print(f"[{DEVICE_STATUS}] [FAST-SEARCH] Query: {image.filename}")
 
-        # Ultra-fast settings: skip detector, use cached embeddings
+        # Fast settings: opencv detector (faster than retinaface)
         dfs = DeepFace.find(
             img_path=path,
             db_path=DB_DIR,
             model_name="Facenet512",
-            detector_backend="skip",  # Skip face detection = FASTEST
-            enforce_detection=False,
+            detector_backend="opencv",  # Fast detector
+            enforce_detection=True,  # Ensure face is detected
             silent=True,
-            align=False,  # Skip alignment for speed
+            align=True,
             normalization="base"
         )
 
-        results = []
-        best_match = None
-        best_distance = 1.0
+        # Dictionary to track best match per person
+        best_matches_per_person = {}
+        total_matches = 0
 
         for df in dfs:
             if df.empty: continue
             
             matches = df.to_dict('records')
             for match in matches:
+                total_matches += 1
                 id_path = match.get('identity', '').replace('/', os.sep).replace('\\', os.sep)
                 parts = id_path.split(os.sep)
                 name = parts[-2] if len(parts) >= 2 else "Unknown"
                 
                 dist = float(match.get('distance', 1.0))
-                if dist < best_distance:
-                    best_distance = dist
-                    best_match = {
+                
+                # Keep only the best match per person (lowest distance = highest confidence)
+                if name not in best_matches_per_person or dist < best_matches_per_person[name]['distance']:
+                    best_matches_per_person[name] = {
                         "name": name,
                         "distance": dist,
-                        "confidence": round((1 - dist) * 100, 2)
+                        "confidence": round((1 - dist) * 100, 1)
                     }
+        
+        # Get the overall best match
+        best_match = None
+        if best_matches_per_person:
+            best_match = min(best_matches_per_person.values(), key=lambda x: x['distance'])
+        
+        # Convert to sorted list
+        all_matches = sorted(best_matches_per_person.values(), key=lambda x: x['distance'])
 
         elapsed = time.time() - start_time
         
-        print(f"[FAST-RESULT] Best match: {best_match['name'] if best_match else 'None'} in {elapsed:.2f}s")
+        if best_match:
+            print(f"[FAST-RESULT] Best match: {best_match['name']} ({best_match['confidence']}%) in {elapsed:.2f}s")
+            if len(all_matches) > 1:
+                print(f"[FAST-RESULT] Found {len(all_matches)} unique people (filtered {total_matches - len(all_matches)} duplicates)")
+        else:
+            print(f"[FAST-RESULT] No match found in {elapsed:.2f}s")
 
         return {
             "success": True,
-            "match": best_match,
+            "best_match": best_match,
+            "all_matches": all_matches,
+            "unique_count": len(all_matches),
+            "total_matches": total_matches,
             "elapsed_seconds": round(elapsed, 3),
             "device": DEVICE_STATUS
         }
     except Exception as e:
+        elapsed = time.time() - start_time
+        error_msg = str(e)
+        
+        # Check if it's a face detection error
+        if "Face could not be detected" in error_msg or "FaceNotDetected" in str(type(e).__name__):
+            print(f"[WARNING] No face detected in {image.filename}")
+            return {
+                "success": False,
+                "error": "NO_FACE_DETECTED",
+                "message": "Không phát hiện khuôn mặt trong ảnh. Vui lòng chụp lại ảnh có khuôn mặt rõ ràng.",
+                "elapsed_seconds": round(elapsed, 3)
+            }
+        
+        # Other errors
         print(f"[ERROR] {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return {
+            "success": False,
+            "error": "PROCESSING_ERROR",
+            "message": f"Lỗi xử lý ảnh: {error_msg}",
+            "elapsed_seconds": round(elapsed, 3)
+        }
     finally:
         cleanup(path)
 

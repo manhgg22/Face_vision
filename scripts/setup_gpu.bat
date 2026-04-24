@@ -3,6 +3,9 @@ echo ========================================================
 echo SETTING UP PYTHON 3.10 AND TENSORFLOW GPU
 echo FOR NVIDIA RTX 3050 (NATIVE WINDOWS)
 echo ========================================================
+
+cd /d "%~dp0.."
+
 echo.
 echo [1/4] Downloading and installing Python 3.10...
 echo (Note: If a UAC prompt appears, please click Yes)
@@ -42,8 +45,7 @@ echo DONE!
 echo The system is now configured to use your NVIDIA RTX 3050.
 echo ========================================================
 echo HOW TO RUN:
-echo From now on, to start the server with GPU, run these 2 commands:
-echo 1. call .venv\Scripts\activate
-echo 2. python face_service.py
+echo From now on, to start the server with GPU, run:
+echo   scripts\start_gpu.bat
 echo ========================================================
 pause

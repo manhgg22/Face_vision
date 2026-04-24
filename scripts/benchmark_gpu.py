@@ -62,8 +62,8 @@ if not sample_img:
 print(f"\n📸 Test image: {sample_img}")
 print("\n" + "="*70)
 
-# Test 1: RetinaFace (chính xác nhưng chậm)
-print("\n[TEST 1] RetinaFace Detector (Độ chính xác cao)")
+# Test 1: RetinaFace (chính xác nhất - theo tài liệu DeepFace)
+print("\n[TEST 1] RetinaFace Detector (Chinh xac nhat - theo DeepFace)")
 print("-" * 70)
 start = time.time()
 try:
@@ -72,7 +72,7 @@ try:
         db_path=DB_DIR,
         model_name="Facenet512",
         detector_backend="retinaface",
-        enforce_detection=False,
+        enforce_detection=True,
         silent=True
     )
     time1 = time.time() - start
@@ -82,8 +82,8 @@ except Exception as e:
     time1 = 0
     print(f"❌ Loi: {e}")
 
-# Test 2: OpenCV (cân bằng)
-print("\n[TEST 2] OpenCV Detector (Can bang)")
+# Test 2: OpenCV (cân bằng tốc độ và độ chính xác)
+print("\n[TEST 2] OpenCV Detector (Can bang toc do va do chinh xac)")
 print("-" * 70)
 start = time.time()
 try:
@@ -92,7 +92,7 @@ try:
         db_path=DB_DIR,
         model_name="Facenet512",
         detector_backend="opencv",
-        enforce_detection=False,
+        enforce_detection=True,
         silent=True
     )
     time2 = time.time() - start
@@ -102,47 +102,20 @@ except Exception as e:
     time2 = 0
     print(f"❌ Loi: {e}")
 
-# Test 3: Skip (nhanh nhất)
-print("\n[TEST 3] Skip Detector (Nhanh nhat)")
-print("-" * 70)
-start = time.time()
-try:
-    result3 = DeepFace.find(
-        img_path=sample_img,
-        db_path=DB_DIR,
-        model_name="Facenet512",
-        detector_backend="skip",
-        enforce_detection=False,
-        silent=True,
-        align=False
-    )
-    time3 = time.time() - start
-    matches3 = len(result3[0]) if result3 and not result3[0].empty else 0
-    print(f"✅ Thoi gian: {time3:.2f}s | Ket qua: {matches3} matches")
-except Exception as e:
-    time3 = 0
-    print(f"❌ Loi: {e}")
-
 # Tổng kết
 print("\n" + "="*70)
 print("TONG KET")
 print("="*70)
 
 if time1 > 0:
-    print(f"RetinaFace: {time1:.2f}s (baseline)")
+    print(f"RetinaFace: {time1:.2f}s (baseline - chinh xac nhat)")
 if time2 > 0 and time1 > 0:
     speedup2 = time1 / time2
     print(f"OpenCV:     {time2:.2f}s (nhanh hon {speedup2:.1f}x)")
-if time3 > 0 and time1 > 0:
-    speedup3 = time1 / time3
-    print(f"Skip:       {time3:.2f}s (nhanh hon {speedup3:.1f}x) ⚡")
 
-print("\n💡 KHUYEN NGHI:")
-if time3 > 0 and time3 < 3:
-    print("   ✅ Dung detector='skip' cho FaceID/Unlock (nhanh nhat!)")
-elif time2 > 0 and time2 < 5:
-    print("   ✅ Dung detector='opencv' cho can bang toc do va do chinh xac")
-else:
-    print("   ⚠️ Can toi uu them hoac nang cap GPU")
+print("\n💡 KHUYEN NGHI (Theo tai lieu DeepFace):")
+print("   ✅ RetinaFace: Do chinh xac cao nhat, phu hop cho production")
+print("   ✅ OpenCV: Can bang toc do va do chinh xac, phu hop cho /find-fast")
+print("\n📚 Model Facenet512: 98.4% accuracy (cao nhat trong benchmark)")
 
 print("\n" + "="*70)

@@ -93,13 +93,13 @@ if sample_img:
     start_time = time.time()
     
     try:
-        # Sử dụng detector="skip" để nhanh nhất
+        # Sử dụng detector="retinaface" theo tài liệu DeepFace
         dfs = DeepFace.find(
             img_path=sample_img,
             db_path=DB_DIR,
             model_name="Facenet512",
-            detector_backend="skip",  # FASTEST!
-            enforce_detection=False,
+            detector_backend="retinaface",  # Chính xác nhất
+            enforce_detection=True,
             silent=True
         )
         
