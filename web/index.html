@@ -495,8 +495,8 @@
             }
 
             if (data.success && data.match_count > 0 && data.results.length > 0) {
-                // Get the best match (should only be one now)
-                const bestMatch = data.results[0][0];
+                // Get the best match
+                const bestMatch = data.results[0];
                 const confidence = ((1 - bestMatch.distance) * 100).toFixed(1);
 
                 let html = '<div style="margin-bottom:15px; font-weight:600; color:var(--text-dim)">KẾT QUẢ PHÂN TÍCH:</div>';

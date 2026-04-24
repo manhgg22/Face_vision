@@ -19,6 +19,7 @@ import sys
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Giảm logging
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '1'  # Enable oneDNN optimizations
 os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'  # Tối ưu threading
+os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices=false'  # Fix ptxas.exe issue
 
 site_packages = [p for p in site.getsitepackages() if "site-packages" in p]
 site_packages = site_packages[0] if site_packages else site.getsitepackages()[-1]
@@ -50,9 +51,6 @@ import tensorflow as tf
 # Kiểm tra trạng thái GPU
 gpus = tf.config.list_physical_devices('GPU')
 DEVICE_STATUS = "🚀 [GPU] NVIDIA RTX ACTIVE" if gpus else "⚠️ [CPU] FALLBACK MODE"
-
-# Optimized for Windows without full CUDA SDK (fixing ptxas.exe issue)
-os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices=false'
 
 # Configure GPU memory growth to avoid OOM errors
 if gpus:

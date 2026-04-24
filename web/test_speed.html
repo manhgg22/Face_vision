@@ -152,10 +152,8 @@
 
                 if (data.results && data.results.length > 0) {
                     html += `<p><strong>Người được nhận diện:</strong></p><ul>`;
-                    data.results.forEach(resultSet => {
-                        resultSet.forEach(match => {
-                            html += `<li>${match.name} (Distance: ${match.distance.toFixed(4)})</li>`;
-                        });
+                    data.results.forEach(match => {
+                        html += `<li>${match.name} (Distance: ${match.distance.toFixed(4)})</li>`;
                     });
                     html += `</ul>`;
                 }
@@ -199,10 +197,11 @@
                 let html = `<div class="result">`;
                 html += `<p class="speed">⚡ ${fastTime.toFixed(2)} giây</p>`;
 
-                if (data.match) {
-                    html += `<p><strong>Người được nhận diện:</strong> ${data.match.name}</p>`;
-                    html += `<p><strong>Distance:</strong> ${data.match.distance.toFixed(4)}</p>`;
-                    html += `<p><strong>Confidence:</strong> ${data.match.confidence}%</p>`;
+                const bestMatch = data.best_match || data.match;
+                if (bestMatch) {
+                    html += `<p><strong>Người được nhận diện:</strong> ${bestMatch.name}</p>`;
+                    html += `<p><strong>Distance:</strong> ${bestMatch.distance.toFixed(4)}</p>`;
+                    html += `<p><strong>Confidence:</strong> ${bestMatch.confidence}%</p>`;
                 } else {
                     html += `<p>Không tìm thấy kết quả phù hợp</p>`;
                 }
